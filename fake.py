@@ -3,23 +3,30 @@
 模拟发送任务
 """
 import json
+from optparse import OptionParser
 
 import redis
 
+from seed import seeds
 
-def load_fake_seed_task():
-    task = {
-        "_id": "mt.91.com___meinv/xiangchemeinv/list_29",
-        "domain": "mt.91.com",
-        "extends" : {
-            "tags" : ["香车美女"]
-        }
-    }
-    return task
+r = redis.Redis()
+
+
+def clean():
+    r.delete("beauty")
+    r.delete("beautyqueue")
+
+
+def main(domain):
+    clean()
+    task = [s for s in seeds if s.get("domain") == domain]
+    print task[0]
+    r.lpush("beauty", json.dumps(task[0]))
 
 
 if __name__ == '__main__':
-    r = redis.Redis()
-    r.delete("beauty")
-    r.delete("beautyqueue")
-    r.lpush("beauty", json.dumps(load_fake_seed_task()))
+    parser = OptionParser()
+    parser.add_option('-d', '--domain', dest='domain',
+                      help='seed domain')
+    (options, args) = parser.parse_args()
+    main(options.domain)
