@@ -140,3 +140,19 @@ class IntNormalizor(Normalizor):
             except Exception:
                 return
 
+class ListNormalizor(Normalizor):
+
+    clean_tags = [
+        "","\n","\r","tags","tag",":"
+    ]
+
+    def normalize(self, obj):
+        obj = obj.lower()
+        for _tag in self.clean_tags:
+            obj = obj.replace(_tag,"")
+        result = obj.split(",")
+        result = list(set([s.strip() for s in result]))
+        if "" in result:
+            result.remove("")
+        return result
+

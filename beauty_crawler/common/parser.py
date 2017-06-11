@@ -5,10 +5,9 @@
 import logging
 import re
 
+from beauty_crawler.common.normalizer import DateNormalizor, ListNormalizor
 from beauty_crawler.common.regex_cache import RegexCache
 from beauty_crawler.util.date_util import norm_date
-
-from beauty_crawler.common.normalizer import DateNormalizor
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +39,22 @@ class ListParser(RuleParser):
             item = {"_id": self.gallery_id.extract(block)}
             items.append(item)
         all_page = self.all_page.extract(response)
-        return items,all_page
+        return items, all_page
+
 
 class GalleryParser(RuleParser):
     def __init__(self, rule):
         RuleParser.__init__(self, rule)
         self.title = ExtractField(name="title", rule=rule.get("title"), result_type=ExtractRuleType.STR)
-        self.publish_time = ExtractField(name="publish_time", rule=rule.get("publish_time"), result_type=ExtractRuleType.STR,normalizor=DateNormalizor())
+        self.publish_time = ExtractField(name="publish_time", essential=False, rule=rule.get("publish_time", ),
+                                         result_type=ExtractRuleType.STR, normalizor=DateNormalizor())
         self.all_page = ExtractField(name="all_page", rule=rule.get("all_page"), result_type=ExtractRuleType.STR)
         self.image_url = ExtractField(name="image_url", rule=rule.get("image_url"), result_type=ExtractRuleType.STR)
+        self.desc = ExtractField(name="desc", rule=rule.get("desc"), essential=False, result_type=ExtractRuleType.STR)
+        self.tags = ExtractField(name="tags", rule=rule.get("tags"), essential=False, result_type=ExtractRuleType.STR,
+                                 normalizor=ListNormalizor())
+        self.image_block = ExtractField(name="image_block", rule=rule.get("image_block"),
+                                        result_type=ExtractRuleType.NODES)
 
     def parse(self, response):
         """
@@ -56,13 +62,26 @@ class GalleryParser(RuleParser):
         :param response:
         :return:
         """
-        item = {
-            "title" : self.title.extract(response),
-            "publish_time" : self.publish_time.extract(response),
-            "all_page" : self.all_page.extract(response),
-            "image_url" : self.image_url.extract(response)
-        }
-        return [item]
+
+        def extract_singal(selector):
+            item = {
+                "title": self.title.extract(selector),
+                "publish_time": self.publish_time.extract(selector),
+                "all_page": self.all_page.extract(selector),
+                "image_url": self.image_url.extract(selector),
+                "desc": self.desc.extract(selector),
+                "tags": self.tags.extract(selector)
+            }
+            return item
+
+        items = []
+        if self.image_block.rule is not None:
+            blocks = self.image_block.extract(response)
+            for block in blocks:
+                items.append(extract_singal(block))
+        else:
+            items.append(extract_singal(response))
+        return items
 
 
 class ExtractRuleType(object):
@@ -93,6 +112,10 @@ class ExtractField(object):
         self.validator = validator
 
     def extract(self, selector):
+        logger.debug("---------1----------start extract {name}".format(name=self.name))
+        if not self.rule:
+            return None
+        logger.debug("---------2-----------using rule {rule}".format(rule=self.rule))
         result = self.extract_rule.extract(selector)
         if result and self.normalizor:
             result = self.normalizor.normalize(result)
@@ -191,7 +214,7 @@ class ExtractRule(object):
                 if res:
                     break
         if res:
-            logger.debug("-------------1-------------  get " + res)
+            logger.debug("-------------3-------------  get " + res)
             return self.__do_regex_and_ops(res)
 
     def __do_regex_and_ops(self, res):

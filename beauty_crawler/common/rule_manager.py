@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import rules
-from beauty_crawler.common.parser import ListParser
-
 from beauty_crawler.common.parser import GalleryParser
+from beauty_crawler.common.parser import ListParser
 
 
 class RuleManager:
@@ -18,12 +17,8 @@ class RuleManager:
             self.list_parser_map[rule.get("domain")] = ListParser(rule.get("list"))
             self.gallery_parser_map[rule.get("domain")] = GalleryParser(rule.get("gallery"))
 
-    def gen_list_url(self, task,page=1):
+    def gen_list_url(self, task, page=1):
         """
-        task = {
-        "_id": "mt.91.com___meinv/xiangchemeinv/list_29",
-        "domain": "mt.91.com"
-        }
         :param task:
         :return:
         """
@@ -36,37 +31,45 @@ class RuleManager:
             url = rule.get("list_url").format(listid=_id, page=page)
         return url
 
-    def gen_detail_url(self,task,page=1):
+    def gen_detail_url(self, task, page=1):
         """
         {'_id': u'2013072321592409', 'insert_time': 1496670529, 'from_id': u'mt.91.com___meinv/xiangchemeinv/list_29'}
         :param task:
         :return:
         """
         from_id = task.get("from_id")
-        domain,_ = from_id.split("___")
+        domain, _ = from_id.split("___")
         rule = self.rules_map.get(domain, {}).get("gallery", {})
         if page == 1:
-            url = rule.get("gallery_first_url", rule.get("gallery_url", "")).format(galleryid=task.get("_id"), page=page)
+            url = rule.get("gallery_first_url", rule.get("gallery_url", "")).format(galleryid=task.get("_id"),
+                                                                                    page=page)
         else:
-            url =  rule.get("gallery_url", "").format(galleryid=task.get("_id"), page=page)
+            url = rule.get("gallery_url", "").format(galleryid=task.get("_id"), page=page)
         return url
 
     def parse_list(self, task, response):
         domain = task.get("domain")
-        items,all_page = self.list_parser_map.get(domain).parse(response)
-        return items,int(all_page)
+        items, all_page = self.list_parser_map.get(domain).parse(response)
+        return items, int(all_page)
 
-    def parse_detail(self,task,response):
+    def parse_detail(self, task, response):
         domain, _id = task.get("from_id").split("___")
         items = self.gallery_parser_map.get(domain).parse(response)
         return items
 
+    def need_flip(self, gallery):
+        domain = gallery.get("domain")
+        return self.rules_map.get(domain).get("gallery", {}).get("need_flip", True)
 
-
-if __name__ == '__main__':
-    manager = RuleManager()
-    task = {
-        "_id": "mt.91.com___meinv/xiangchemeinv/list_29",
-        "domain": "mt.91.com"
-    }
-    print manager.gen_list_url(task)
+    def order_calculate(self, gallery, now_page, index):
+        """
+        计算图片的order值
+        :param gallery: 图集属性
+        :param now_page: 爬取到图片的页数
+        :param index: 该页中的第几个图片，从0开始
+        :return:
+        """
+        if not self.need_flip(gallery):
+            return index + 1
+        else:
+            return (now_page - 1) * 100 + index + 1
